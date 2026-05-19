@@ -1,0 +1,332 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "DDFFESSDSDD_Utility"
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 250, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+MainFrame.BorderColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = Gui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Text = "DDFFESSDSDD's Script"
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 18
+Title.Parent = MainFrame
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -30, 0, 0)
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.Text = "X"
+CloseButton.Font = Enum.Font.SourceSansBold
+CloseButton.TextSize = 18
+CloseButton.Parent = Title
+CloseButton.MouseButton1Click:Connect(function()
+    Gui.Enabled = false
+end)
+
+local ToggleGuiButton = Instance.new("TextButton")
+ToggleGuiButton.Size = UDim2.new(0, 100, 0, 30)
+ToggleGuiButton.Position = UDim2.new(0.5, -50, 1, 10)
+ToggleGuiButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+ToggleGuiButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleGuiButton.Text = "Toggle UI (F5)"
+ToggleGuiButton.Font
+= Enum.Font.SourceSansBold
+ToggleGuiButton.TextSize = 14
+ToggleGuiButton.Parent = Gui
+ToggleGuiButton.MouseButton1Click:Connect(function()
+    Gui.Enabled = not Gui.Enabled
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+    if input.KeyCode == Enum.KeyCode.F5 and not gameProcessedEvent then
+        Gui.Enabled = not Gui.Enabled
+    end
+end)
+
+local currentY = 35
+
+local function createToggle(name, default, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -10, 0, 25)
+    button.Position = UDim2.new(0, 5, 0, currentY)
+    button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Text = name .. ": " .. (default and "ON" or "OFF")
+    button.Font = Enum.Font.SourceSans
+    button.TextSize = 14
+    button.Parent = MainFrame
+
+    local state = default
+    button.MouseButton1Click:Connect(function()
+        state = not state
+        button.Text = name .. ": " .. (state and "ON" or "OFF")
+        callback(state)
+    end)
+    currentY = currentY + 30
+    callback(state)
+    return state
+end
+
+local function createSlider(name, minVal, maxVal, defaultVal, callback)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -10, 0, 20)
+    label.Position = UDim2.new(0, 5, 0, currentY)
+    label.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Text = name .. ": " .. defaultVal
+    label.Font = Enum.Font.SourceSans
+    label.TextSize = 14
+    label.Parent = MainFrame
+    currentY = currentY + 25
+
+    local sliderFrame = Instance.new("Frame")
+    sliderFrame.Size = UDim2.new(1, -10, 0, 10)
+    sliderFrame.Position = UDim2.new(0, 5, 0, currentY)
+    sliderFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    sliderFrame.Parent = MainFrame
+
+    local slider = Instance.new("Frame")
+    slider.Size = UDim2.new((defaultVal - minVal) / (maxVal - minVal), 0, 1, 0)
+    slider.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    slider.Parent = sliderFrame
+
+    local dragging = false
+    local currentValue = defaultVal
+
+    sliderFrame.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local mouseX = input.Position.X
+            local frameX = sliderFrame.AbsolutePosition.X
+            local frameWidth = sliderFrame.AbsoluteSize.X
+            local relativeX = math.clamp((mouseX - frameX) / frameWidth, 0, 1)
+
+            currentValue = minVal + (maxVal - minVal) * relativeX
+            slider.Size = UDim2.new(relativeX, 0, 1, 0)
+            label.Text = name .. ": " .. string.format("%.1f", currentValue)
+            callback(currentValue)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    currentY = currentY + 15
+    callback(defaultVal)
+    return currentValue
+end
+
+local espColors = {
+    Alive = Color3.fromRGB(0, 255, 0),
+    Killer = Color3.fromRGB(255, 0, 0),
+    Doors = Color3.fromRGB(128, 128, 128),
+    Generators = Color3.fromRGB(128, 128, 128),
+    EscapePoint = Color3.fromRGB(255, 255, 0),
+    FuseBox = Color3.fromRGB(255, 165, 0),
+    BearTrap = Color3.fromRGB(100, 50, 0)
+}
+
+local espEnabled = false
+local espObjects = {}
+local espLabelsEnabled = false
+
+local function createESPVisual(part, color, labelText, outline)
+    if not part or not part.Parent or espObjects[part] then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = part
+    highlight.FillColor = color
+    highlight.FillTransparency = 0.7
+    highlight.OutlineColor = color
+    highlight.OutlineTransparency = outline and 0 or 1
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = Workspace.CurrentCamera
+
+local label = nil
+    if labelText then
+        label = Instance.new("BillboardGui")
+        label.Size = UDim2.new(0, 100, 0, 30)
+        label.Adornee = part
+        label.AlwaysOnTop = true
+        label.ExtentsOffset = Vector3.new(0, part.Size.Y / 2 + 1, 0)
+        label.Parent = Workspace.CurrentCamera
+
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Size = UDim2.new(1, 0, 1, 0)
+        textLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        textLabel.BackgroundTransparency = 0.5
+        textLabel.TextColor3 = color
+        textLabel.Text = labelText
+        textLabel.Font = Enum.Font.SourceSansBold
+        textLabel.TextSize = 14
+        textLabel.Parent = label
+        label.Enabled = espLabelsEnabled
+    end
+
+    espObjects[part] = {highlight = highlight, label = label}
+end
+
+local function updateESP()
+    for _, obj in pairs(espObjects) do
+        if obj.highlight then obj.highlight:Destroy() end
+        if obj.label then obj.label:Destroy() end
+    end
+    espObjects = {}
+
+    if not espEnabled then return end
+
+    local mapsFolder = Workspace:FindFirstChild("MAPS")
+    if not mapsFolder then return end
+    local gameMap = mapsFolder:FindFirstChild("GAME MAP")
+    if not gameMap then return end
+
+    -- Players ESP
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player == LocalPlayer then continue end
+        local character = player.Character
+        if character then
+            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+            if humanoidRootPart then
+                local playerFolder = player.Parent:FindFirstChild(player.Name)
+                if playerFolder and playerFolder.Parent and playerFolder.Parent.Name == "KILLER" then
+                    createESPVisual(humanoidRootPart, espColors.Killer, "Killer", false)
+                elseif playerFolder and playerFolder.Parent and playerFolder.Parent.Name == "ALIVE" then
+                    createESPVisual(humanoidRootPart, espColors.Alive, "Survivor", false)
+                end
+            end
+        end
+    end
+
+    -- Doors ESP
+    local doorsFolder = gameMap:FindFirstChild("Doors")
+    if doorsFolder then
+        for _, doorModel in ipairs(doorsFolder:GetChildren()) do
+            if doorModel:IsA("Model") then
+                local primaryPart = doorModel.PrimaryPart or doorModel:FindFirstChildOfClass("BasePart")
+                if primaryPart then
+                    createESPVisual(primaryPart, espColors.Doors, "Door", false)
+                end
+            end
+        end
+    end
+
+    -- Generators ESP
+    local tasksFolder = gameMap:FindFirstChild("Tasks")
+    if tasksFolder then
+        local generatorsFolder = tasksFolder:FindFirstChild("Generators")
+        if generatorsFolder then
+            for _, generatorModel in ipairs(generatorsFolder:GetChildren()) do
+                if generatorModel:IsA("Model") and generatorModel.Name == "Generator" then
+                    local primaryPart = generatorModel.PrimaryPart or generatorModel:FindFirstChildOfClass("BasePart")
+                    if primaryPart then
+                        createESPVisual(primaryPart, espColors.Generators, "Generator", false)
+                    end
+                end
+            end
+        end
+
+        -- FuseBoxes ESP
+        local fuseBoxesFolder = tasksFolder:FindFirstChild("FuseBoxes")
+        if fuseBoxesFolder then
+            for _, fuseBoxModel in ipairs(fuseBoxesFolder:GetChildren()) do
+                if fuseBoxModel:IsA("Model") and fuseBoxModel.Name == "FuseBox" then
+                    local primaryPart = fuseBoxModel.PrimaryPart or fuseBoxModel:FindFirstChildOfClass("BasePart")
+                    if primaryPart then
+                        createESPVisual(primaryPart, espColors.FuseBox, "FuseBox", false)
+                    end
+                end
+            end
+        end
+    end
+
+    -- BearTrap ESP (anywhere)
+    for _, part in ipairs(Workspace:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name == "BearTrap" then
+            createESPVisual(part, espColors.BearTrap, "TRAP", false)
+        end
+    end
+
+    -- EscapePoint ESP
+    local escapesFolder = gameMap:FindFirstChild("Escapes")
+    if escapesFolder then
+        local escapePoint = escapesFolder:FindFirstChild("EscapePoint")
+        if escapePoint and escapePoint:IsA("Model") then
+            local primaryPart = escapePoint.PrimaryPart or escapePoint:FindFirstChildOfClass("BasePart")
+            if primaryPart then
+                createESPVisual(primaryPart, espColors.EscapePoint, "EscapePoint", true)
+            end
+        end
+    end
+end
+
+local function updateESPLabels()
+    for _, obj in pairs(espObjects) do
+        if obj.label then
+            obj.label.Enabled = espLabelsEnabled
+        end
+    end
+end
+
+createToggle("ESP", false, function(state)
+    espEnabled = state
+    updateESP()
+end)
+
+createToggle("ESP Labels", true, function(state)
+    espLabelsEnabled = state
+    updateESPLabels()
+end)
+
+createSlider("WalkSpeed", 16, 100, 16, function(value)
+    if LocalPlayer and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = value
+    end
+end)
+
+createSlider("FOV", 70, 120, 70, function(value)
+    Camera.FieldOfView = value
+end)
+
+local fullbrightEnabled = false
+createToggle("Fullbright", false, function(state)
+    fullbrightEnabled = state
+    if state then
+        Lighting.Brightness = 5
+        Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+    else
+        Lighting.Brightness = 2
+        Lighting.OutdoorAmbient = Color3.fromRGB(0, 0, 0)
+        Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+    end
+end)
+
+local instantPromptsEnabled = false
+createToggle("Instant Prompts", false, function(state)
+    instantPromptsEnabled = state
+    if state then
+        for _, prompt in ipairs(Workspace:GetDescendant()

@@ -3,8 +3,8 @@ local id = game.PlaceId
 if id == 70845479499574 then 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/BBN"))()
 
-elseif id == 6516141723 then 
-    print("kittyuh stinks they very mean grr")
+elseif id == 11276071411 then 
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/Npcordie"))()
 
 else
     print("game isnt supported")

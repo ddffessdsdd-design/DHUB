@@ -3,8 +3,8 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
     Name = "Pressure 0.5",
     Icon = 0,
-    LoadingTitle = "Pressure 0.5",
-    LoadingSubtitle = "by Normalplayer",
+    LoadingTitle = "Pressure",
+    LoadingSubtitle = "by DDFF",
     Theme = {
         TextColor = Color3.fromRGB(200, 225, 255),
         Background = Color3.fromRGB(10, 18, 35),
@@ -41,7 +41,7 @@ local Window = Rayfield:CreateWindow({
     ToggleUIKeybind = "K",
     DisableRayfieldPrompts = false,
     DisableBuildWarnings = false,
-    ConfigurationSaving = { Enabled = true, FolderName = "Pressure", FileName = "Pressure" },
+    ConfigurationSaving = { Enabled = true, FolderName = "PressureIDK", FileName = "Pressure" },
     KeySystem = false
 })
 
@@ -54,7 +54,7 @@ local function CleanupCharacter(char)
     local hum  = char:FindFirstChildOfClass("Humanoid")
     if root then root.Anchored = false end
     if hum  then
-        hum.WalkSpeed = 16
+        hum.WalkSpeed = 30
         hum.JumpPower = 50
     end
 end
@@ -72,13 +72,12 @@ local noclipLoop = nil
 CleanupCharacter(Player.Character)
 Player.CharacterAdded:Connect(CleanupCharacter)
 
-task.wait(2)
-Rayfield:Notify({
-    Title = "Pressure 0.5",
-    Content = "Please report any bugs in the comments of ScriptBlox, or leave a suggestion!",
-    Duration = 8,
-    Image = "message-circle",
-})
+-- IDK
+local Credits = Window:CreateTab("Credits", "file-text")
+Credits:CreateParagraph({
+    Title = "NormalPlayer",
+    Content = "Original script by NormalPlayer on ScriptBlox,https://scriptblox.com/script/Half-A-Slice-Of-Cake-Pressure-Pressure-Script-Keyless-free-176608"
+-- IDK 
 
 local Updates = Window:CreateTab("Updates", "file-text")
 Updates:CreateParagraph({
@@ -399,7 +398,7 @@ end
 
 Esp:CreateSection("Items")
 CreateESPToggle(Esp, "Keycard ESP",              "EspKeycard",  function(n) return KEYCARDS[n] end)
-CreateESPToggle(Esp, "Currency & Blueprint ESP", "EspCurrency", function(n) return GetCurrencyConfig(n) end)
+CreateESPToggle(Esp, "Currency ESP", "EspCurrency", function(n) return GetCurrencyConfig(n) end)
 CreateESPToggle(Esp, "Item ESP",                 "EspItems",    function(n) return GetItemConfig(n) end)
 
 Esp:CreateSection("Monsters")
@@ -409,7 +408,7 @@ Esp:CreateToggle({
     Name="Monster Locker ESP", CurrentValue=false, Flag="EspMonsterLocker",
     Callback=function(Value)
         lockerActive = Value
-        local cfg = { label="⚠ MONSTER LOCKER", fill=Color3.fromRGB(200,0,0), outline=Color3.fromRGB(255,80,80), textColor=Color3.fromRGB(255,80,80), fillTransparency=0.3 }
+        local cfg = { label="VOID MASS", fill=Color3.fromRGB(200,0,0), outline=Color3.fromRGB(255,80,80), textColor=Color3.fromRGB(255,80,80), fillTransparency=0.3 }
         if Value then
             lockerConns = ScanRooms(
                 function() return lockerActive end,
@@ -433,7 +432,7 @@ Esp:CreateToggle({
     Name="Fake Door ESP", CurrentValue=false, Flag="EspFakeDoor",
     Callback=function(Value)
         fakeDoorActive = Value
-        local cfg = { label="✖ FAKE DOOR", fill=Color3.fromRGB(180,0,0), outline=RED, textColor=RED, fillTransparency=0.3 }
+        local cfg = { label="Z-96", fill=Color3.fromRGB(180,0,0), outline=RED, textColor=RED, fillTransparency=0.3 }
         if Value then
             fakeDoorConns = ScanRooms(
                 function() return fakeDoorActive end,
@@ -650,7 +649,7 @@ Esp:CreateToggle({
                     e.Enabled = false
                 end
             end
-            L.Brightness=10; L.ClockTime=14; L.FogEnd=100000
+            L.Brightness=8; L.ClockTime=14; L.FogEnd=100000
             L.GlobalShadows=false
             L.Ambient=Color3.fromRGB(255,255,255)
             L.OutdoorAmbient=Color3.fromRGB(255,255,255)
@@ -758,15 +757,16 @@ Auto:CreateToggle({
             local ok = pcall(function()
                 freezePlayer(true)
 
-                platform = Instance.new("Part")
-                platform.Size = Vector3.new(10,1,10)
-                platform.CFrame = CFrame.new(savedCFrame.Position + Vector3.new(0,320,0))
-                platform.Anchored = true
-                platform.CanCollide = true
-                platform.Transparency = 0.3
-                platform.Material = Enum.Material.SmoothPlastic
-                platform.BrickColor = BrickColor.new("Bright blue")
-                platform.Parent = workspace
+platform = Instance.new("Part") 
+platform.Size = Vector3.new(2000, 1, 2000) 
+platform.CFrame = CFrame.new(savedCFrame.Position + Vector3.new(0, 320, 0)) 
+platform.Anchored = true 
+platform.CanCollide = true 
+platform.Transparency = 0 
+platform.Material = Enum.Material.Studs -- Classic Lego-style bumpy surface
+platform.BrickColor = BrickColor.new("Light stone grey") -- Standard light gray baseplate color
+platform.Parent = workspace
+
 
                 root.Anchored = false
                 root.CFrame = CFrame.new(platform.Position + Vector3.new(0,4,0))
@@ -921,7 +921,7 @@ local lootAuraSection = Auto:CreateSection("Looting")
 
 Auto:CreateSlider({
     Name="Loot Aura Radius",
-    Range={5, 50},
+    Range={5, 500},
     Increment=1,
     Suffix=" studs",
     CurrentValue=15,
@@ -1397,7 +1397,7 @@ CreateAntiToggle(Anti,"Remove Landmines","RemoveLandmines",function(n) return n=
 Anti:CreateSection("Encounters")
 
 Anti:CreateToggle({
-    Name="Remove Firewall", CurrentValue=false, Flag="RemoveFirewall",
+    Name="Remove Firewall:(", CurrentValue=false, Flag="RemoveFirewall",
     Callback=function(Value)
         local conn=nil; local active=Value
         if Value then

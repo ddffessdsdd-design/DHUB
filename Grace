@@ -3,579 +3,631 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- Services
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
-local UIS = game:GetService("UserInputService")
-local TeleportService = game:GetService("TeleportService")
-local MarketplaceService = game:GetService("MarketplaceService")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 
--- Save original lighting
-local ORIGINAL_LIGHTING = {
-    Ambient = Lighting.Ambient,
-    Brightness = Lighting.Brightness,
-    GlobalShadows = Lighting.GlobalShadows,
-    Technology = Lighting.Technology,
-    FogColor = Lighting.FogColor,
-    FogEnd = Lighting.FogEnd,
-    FogStart = Lighting.FogStart
-}
+local authorCredit = math.random(1, 100) == 1 and "by Mac" or "by Mac"
 
--- Author
-local authorCredit = math.random(1, 100) == 1 and "by DDFF" or "by DDFF"
+-- ========================== ENTITY DELETER ==========================
+local exactNames = { "Worm", "Rush", "Rain", "elkman", "GOATPORT", "Goatman" }
+local partialMatches = { "goat" }
 
--- State
-local farming = false
-local fullbrightOn = false
-local espOn = false
-local playerEspOn = false
-local thirdpersonOn = false
-local noClipOn = false
-local flyModeOn = false
-local speedHackOn = false
-local deleteEnemiesOn = false
-local espHighlights = {}
-local playerEspHighlights = {}
-local originalCanCollide = {}
-local espColor = Color3.fromRGB(0, 255, 0)
-local espTransparency = 0.5
-local playerScale = 1
-local currentWalkSpeed = 16
-local currentJumpPower = 50
-local roomCount = 0
-
--- Connections
-local farmConnection, autoModConnection, beaconConnection, deleteEnemiesConnection, flyBodyVelocity
-local flying = false
-local flashbackPositions = {}
-local recordingPositions = false
-
--- Mobile check
-local isMobile = UIS.TouchEnabled and not UIS.KeyboardEnabled
-
--- Entity names
-local ENTITY_NAMES = {
-    ["SendDoppel"] = "Doppel", ["SendPulse"] = "Pulse", ["SendDozer"] = "Dozer",
-    ["SendDrain"] = "Drain", ["SendGoatman"] = "Goatman", ["SendLitany"] = "Litany",
-    ["SendMemory"] = "Memory", ["SendMime"] = "Mime", ["SendRue"] = "Rue",
-    ["SendRush"] = "Carnation", ["SendSorrow"] = "Sorrow", ["SendWorm"] = "Worm"
-}
-
-local REMOTES = {"SendDoppel", "SendPulse", "SendDozer", "SendDrain", "SendGoatman", 
-    "SendLitany", "SendMemory", "SendMime", "SendRue", "SendRush", "SendSorrow", "SendWorm"}
-
-local ENEMY_NAMES = {"Doppel", "Pulse", "Dozer", "Drain", "Goatman", "Litany", 
-    "Memory", "Mime", "Rue", "Rush", "Carnation", "Sorrow", "Worm", "Monster", "Entity", "Enemy", "Creature", "elkman"}
-
--- Teleport helper
-local function teleportTo(part)
-    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if hrp and part and part:IsA("BasePart") then
-        hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+local function shouldDelete(inst)
+    local name = inst.Name
+    for _, n in ipairs(exactNames) do
+        if name == n then return true end
     end
+    local lower = name:lower()
+    for _, p in ipairs(partialMatches) do
+        if lower:find(p) then return true end
+    end
+    if name == "Part" and inst:FindFirstChild("rueflashparticle") then return true end
+    if name == "Part" then
+        local hands = inst:FindFirstChild("hands")
+        if hands and hands:IsA("Folder") then return true end
+    end
+    return false
 end
 
--- Notify
-local function notify(title, content)
-    Rayfield:Notify({Title = title, Content = content, Duration = 3})
-end
+local scanServices = { Workspace, ReplicatedStorage }
+local playerGui = player:FindFirstChild("PlayerGui")
+if playerGui then table.insert(scanServices, playerGui) end
 
--- Delete enemies
-local function deleteEnemies()
-    local deletedCount = 0
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") then
-            for _, enemyName in ipairs(ENEMY_NAMES) do
-                if string.find(string.lower(obj.Name), string.lower(enemyName)) then
-                    obj:Destroy()
-                    deletedCount = deletedCount + 1
-                    break
+local deleteLoop = nil
+local autoDeleteActive = false
+
+local function deleteEntities()
+    for _, svc in ipairs(scanServices) do
+        if svc then
+            for _, obj in ipairs(svc:GetDescendants()) do
+                if shouldDelete(obj) then
+                    pcall(function() obj:Destroy() end)
                 end
             end
         end
     end
-    return deletedCount
 end
 
-local function startAutoDeleteEnemies()
-    if deleteEnemiesConnection then deleteEnemiesConnection:Disconnect() end
-    deleteEnemiesConnection = task.spawn(function()
-        while deleteEnemiesOn do
-            local count = deleteEnemies()
-            if count > 0 then notify("Delete Enemies", "Deleted " .. count .. " enemies") end
+local function startDeleteLoop()
+    if deleteLoop then return end
+    deleteLoop = task.spawn(function()
+        while autoDeleteActive do
+            deleteEntities()
             task.wait(0.5)
         end
+        deleteLoop = nil
     end)
 end
 
--- Badges
-local function give_badge(id)
-    local remote = ReplicatedStorage:FindFirstChild("BadgeGot")
-    if remote then remote:FireServer(id) end
+local function stopDeleteLoop()
+    autoDeleteActive = false
+    if deleteLoop then
+        task.cancel(deleteLoop)
+        deleteLoop = nil
+    end
 end
 
-local function getAllBadges()
-    local badges = {134887420423652, 4038424598119976, 964968129098934, 3015204003526708,
-        689187327472663, 3592221213186452, 1128379033399384, 3321103449516466,
-        3586950885204077, 682975957560562, 2358699652694855, 2498883759808876,
-        2041953834925014, 4057603527098677, 972895997841573, 1182009509563829,
-        1074165821319312, 2048088862285077, 2490033661438286, 140623221053109,
-        2047605101958438, 2903778750704771, 2546808402470607, 981460182720766,
-        153738631548679, 4240820934454599, 1102273464676850, 1304842223798634,
-        3525349095767364, 1257615017477905, 3164611355775879, 1723310985130598,
-        2103017110352506, 1245157071611435, 483763102854176, 650763858687295,
-        3859560342437046, 59892393420936, 3755020953334282, 712680857392692,
-        1577853136607350, 3429384960682817, 3617074649167407, 3438445391730220,
-        1371243946123494, 2763684024699132, 600138823664243, 838153529696291,
-        764126720344552, 1783264331315392, 1898915476379166, 3651187124814740,
-        3948156977919257, 357404882938639, 357844303001248, 1900477898605392,
-        2213522117386200, 2491038927970508, 4265785024412014, 3569074835929304,
-        697091969136792, 1894157790756264, 1655926255975448, 1594828917266962,
-        1781076504335407, 3614082411310610, 467790024221955, 3570289792047955,
-        2756095289789488, 964591981056574, 1261016311943009, 1188921156834216}
-    
-    task.spawn(function()
-        local success, failed = 0, 0
-        for _, v in ipairs(badges) do
-            if pcall(function() give_badge(v) end) then
-                success = success + 1
-            else
-                failed = failed + 1
-            end
-            task.wait(0.1)
-        end
-        notify("Badges", "Success: " .. success .. ", Failed: " .. failed)
-    end)
-end
-
--- Stickers
-local function getAllStickers()
-    pcall(function()
-        local ClientPlayerData = require(ReplicatedStorage:WaitForChild("ClientPlayerData"))
-        ClientPlayerData:Get()
-        local GraceBase = ReplicatedStorage:WaitForChild("GraceBase")
-        local StickersFolder = GraceBase:WaitForChild("Stickers")
-        local unlockRemote = ReplicatedStorage.ClientPlayerData.UnlockSticker
-        local updatedSticker = ClientPlayerData.UpdatedSticker
-        
-        local unlockedCount = 0
-        for _, sticker in ipairs(StickersFolder:GetChildren()) do
-            local id = sticker.Name
-            if not ClientPlayerData.Data.Stickers[id] then
-                ClientPlayerData.Data.Stickers[id] = true
-                unlockRemote:FireServer(id)
-                unlockedCount = unlockedCount + 1
-            end
-        end
-        updatedSticker:Fire()
-        notify("Stickers", "Unlocked " .. unlockedCount .. " stickers!")
-    end)
-end
-
--- ESP
-local function updateESP()
-    for _, h in ipairs(espHighlights) do if h and h.Parent then h:Destroy() end end
-    espHighlights = {}
-    local rooms = workspace:FindFirstChild("Rooms")
-    if not rooms then return end
-    for _, room in ipairs(rooms:GetChildren()) do
-        if tonumber(room.Name) then
-            for _, modelType in ipairs({"elkman", "Door"}) do
-                local model = room:FindFirstChild(modelType, true)
-                if model and model:IsA("Model") then
-                    local h = Instance.new("Highlight")
-                    h.Adornee = model
-                    h.FillColor = espColor
-                    h.FillTransparency = espTransparency
-                    h.OutlineColor = espColor:lerp(Color3.new(0, 0, 0), 0.3)
-                    h.Parent = model
-                    table.insert(espHighlights, h)
+local function debugScanEntities()
+    local found = {}
+    local allScan = { Workspace, ReplicatedStorage, playerGui }
+    for _, svc in ipairs(allScan) do
+        if svc then
+            for _, obj in ipairs(svc:GetDescendants()) do
+                local lower = obj.Name:lower()
+                if lower:find("worm") or lower:find("rush") or lower:find("rain") or lower:find("elkman") or lower:find("goat") or lower:find("rue") or lower:find("mime") then
+                    table.insert(found, obj:GetFullName() .. " (" .. obj.ClassName .. ")")
                 end
             end
         end
     end
-end
-
-local function updatePlayerESP()
-    for _, h in ipairs(playerEspHighlights) do if h and h.Parent then h:Destroy() end end
-    playerEspHighlights = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player and p.Character then
-            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local h = Instance.new("Highlight")
-                h.Adornee = p.Character
-                h.FillColor = Color3.fromRGB(255, 100, 100)
-                h.FillTransparency = 0.3
-                h.OutlineColor = Color3.fromRGB(200, 0, 0)
-                h.Parent = p.Character
-                table.insert(playerEspHighlights, h)
-            end
-        end
+    if #found == 0 then
+        Rayfield:Notify({Title = "Debug", Content = "No matching entities found", Duration = 3})
+    else
+        print("=== Entity Debug ===")
+        for _, line in ipairs(found) do print(line) end
+        Rayfield:Notify({Title = "Debug", Content = "Check F9 console for names", Duration = 3})
     end
 end
 
--- Autofarm
-local function runAutofarm()
-    local rooms = workspace:FindFirstChild("Rooms")
-    if rooms then
-        local list = rooms:GetChildren()
-        table.sort(list, function(a, b) return tonumber(a.Name) < tonumber(b.Name) end)
-        local idx = #list - 1
-        if idx >= 1 then
-            local target = list[idx]:FindFirstChild("Entrance") or list[idx]:FindFirstChildWhichIsA("BasePart")
-            if target then teleportTo(target) end
-        end
+-- ========================== FULLBRIGHT ==========================
+local originalOutdoorAmbient = Lighting.OutdoorAmbient
+local originalGlobalShadows = Lighting.GlobalShadows
+local fullbrightOn = false
+
+local function toggleFullbright(enabled)
+    fullbrightOn = enabled
+    if enabled then
+        Lighting.OutdoorAmbient = Color3.new(1,1,1)
+        Lighting.GlobalShadows = false
+    else
+        Lighting.OutdoorAmbient = originalOutdoorAmbient
+        Lighting.GlobalShadows = originalGlobalShadows
     end
 end
 
-local function startAutofarm()
-    if farmConnection then farmConnection:Disconnect() end
-    farmConnection = task.spawn(function()
-        while farming do pcall(runAutofarm); task.wait(0.1) end
-    end)
-end
+-- ========================== SORROW DOMAIN TP ==========================
+local sorrowActive = false
+local sorrowThread = nil
 
--- AutoMod
-local function runAutoMod()
-    local rooms = workspace:FindFirstChild("Rooms")
-    if rooms then
-        local sr = rooms:FindFirstChild("Saferoom") or rooms:FindFirstChild("SafeRoom")
-        if sr then
-            local target = sr:FindFirstChild("Entrance") or sr:FindFirstChildWhichIsA("BasePart")
-            if target then teleportTo(target) end
-        end
-    end
-end
-
-local function startAutoMod()
-    if autoModConnection then autoModConnection:Disconnect() end
-    autoModConnection = task.spawn(function()
-        while true do pcall(runAutoMod); task.wait(0.1) end
-    end)
-end
-
--- Beacons
-local function runBeacons()
-    local bm = workspace:FindFirstChild("Beacons")
-    if bm then
-        local parts = {}
-        for _, p in ipairs(bm:GetDescendants()) do
-            if p:IsA("BasePart") and p.Name == "Part" then table.insert(parts, p) end
-        end
-        if #parts > 0 then teleportTo(parts[math.random(1, #parts)]) end
-    end
-end
-
-local function startBeacons()
-    if beaconConnection then beaconConnection:Disconnect() end
-    beaconConnection = task.spawn(function()
-        while beaconsOn do pcall(runBeacons); task.wait(0.1) end
-    end)
-end
-
--- NoClip
-local function saveNoClipState()
-    originalCanCollide = {}
-    if player.Character then
-        for _, p in ipairs(player.Character:GetDescendants()) do
-            if p:IsA("BasePart") then originalCanCollide[p] = p.CanCollide end
-        end
-    end
-end
-
-local function restoreNoClipState()
-    if player.Character then
-        for p, cc in pairs(originalCanCollide) do
-            if p and p.Parent then p.CanCollide = cc end
-        end
-    end
-    originalCanCollide = {}
-end
-
--- Player scale
-local function setPlayerScale(scale)
-    if player.Character then
-        local h = player.Character:FindFirstChild("Humanoid")
-        if h then
-            for _, p in pairs(player.Character:GetChildren()) do
-                if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
-                    local m = p:FindFirstChildOfClass("SpecialMesh")
-                    if m then m.Scale = Vector3.new(scale, scale, scale) end
-                end
-            end
-            for _, a in pairs(player.Character:GetChildren()) do
-                if a:IsA("Accessory") then
-                    local hnd = a:FindFirstChild("Handle")
-                    if hnd then
-                        local m = hnd:FindFirstChildOfClass("SpecialMesh")
-                        if m then m.Scale = Vector3.new(scale, scale, scale) end
+local function getBeaconParts()
+    local beacons = {}
+    for _, folder in ipairs(Workspace:GetDescendants()) do
+        if folder.Name == "Beacon" and folder:IsA("Folder") then
+            local parent = folder.Parent
+            if parent and parent:IsA("Model") and parent:FindFirstChild("BloodOcean") and parent.BloodOcean:IsA("Folder") then
+                for _, part in ipairs(folder:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        table.insert(beacons, part)
                     end
                 end
             end
-            playerScale = scale
         end
     end
+    return beacons
 end
 
--- Fly
-local function startAdminFly()
-    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
-    flying = true
-    local hrp = player.Character.HumanoidRootPart
-    local h = player.Character:FindFirstChild("Humanoid")
-    flyBodyVelocity = Instance.new("BodyVelocity")
-    flyBodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    flyBodyVelocity.Parent = hrp
-    if h then h.PlatformStand = true end
-    notify("Fly", "Enabled")
-end
-
-local function stopAdminFly()
-    flying = false
-    if flyBodyVelocity then flyBodyVelocity:Destroy(); flyBodyVelocity = nil end
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.PlatformStand = false
-    end
-    notify("Fly", "Disabled")
-end
-
--- Flashback
-local function startRecordingPositions()
-    recordingPositions = true
-    flashbackPositions = {}
-    notify("Flashback", "Recording started")
-end
-
-local function stopRecordingPositions()
-    recordingPositions = false
-    notify("Flashback", "Recording stopped - " .. #flashbackPositions .. " positions saved")
-end
-
-local function executeFlashback()
-    if #flashbackPositions == 0 then notify("Flashback", "No positions"); return end
+local function teleportToPart(part)
     local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    task.spawn(function()
-        for i = #flashbackPositions, 1, -1 do
-            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                player.Character.HumanoidRootPart.CFrame = flashbackPositions[i]
-                task.wait(0.03)
-            else break end
+    if hrp and part and part.Parent then
+        hrp.CFrame = part.CFrame + Vector3.new(0,10,0)
+        return true
+    end
+    return false
+end
+
+local function startSorrowLoop()
+    if sorrowThread then return end
+    sorrowThread = task.spawn(function()
+        while sorrowActive do
+            local parts = getBeaconParts()
+            if #parts == 0 then
+                Rayfield:Notify({Title = "Sorrow", Content = "No beacons with BloodOcean", Duration = 2})
+                sorrowActive = false
+                break
+            end
+            for _, part in ipairs(parts) do
+                if not sorrowActive then break end
+                teleportToPart(part)
+                task.wait(0.5)
+            end
+            task.wait(0.5)
         end
-        notify("Flashback", "Completed!")
+        sorrowThread = nil
     end)
 end
 
--- Item giver
-local function giveItemById(itemId)
-    if not itemId or itemId == "" then notify("Item", "Invalid ID"); return end
-    local id = tonumber(itemId)
-    if not id then notify("Item", "Invalid format"); return end
-    pcall(function()
-        local pi = MarketplaceService:GetProductInfo(id)
-        if pi then
-            local tool = Instance.new("Tool")
-            tool.Name = pi.Name or ("Item_" .. itemId)
-            tool.RequiresHandle = true
-            local handle = Instance.new("Part")
-            handle.Name = "Handle"
-            handle.Size = Vector3.new(1, 1, 1)
-            handle.Material = Enum.Material.Plastic
-            handle.BrickColor = BrickColor.new("Bright blue")
-            handle.CanCollide = false
-            handle.Parent = tool
-            tool.Parent = player.Backpack
-            notify("Item", "Given: " .. tool.Name)
+local function stopSorrowLoop()
+    sorrowActive = false
+    if sorrowThread then
+        task.cancel(sorrowThread)
+        sorrowThread = nil
+    end
+end
+
+-- ========================== TRAGEDY2 AUTO-DELETE ==========================
+local tragedyActive = false
+local tragedyThread = nil
+
+local function startTragedyLoop()
+    if tragedyThread then return end
+    tragedyThread = task.spawn(function()
+        while tragedyActive do
+            local hasBloodOcean = false
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj.Name == "BloodOcean" and obj:IsA("Folder") then
+                    hasBloodOcean = true
+                    break
+                end
+            end
+            if hasBloodOcean then
+                for _, obj in ipairs(Workspace:GetDescendants()) do
+                    if obj.Name == "TRAGEDY2" then
+                        pcall(function() obj:Destroy() end)
+                    end
+                end
+            end
+            task.wait(0.5)
+        end
+        tragedyThread = nil
+    end)
+end
+
+local function stopTragedyLoop()
+    tragedyActive = false
+    if tragedyThread then
+        task.cancel(tragedyThread)
+        tragedyThread = nil
+    end
+end
+
+-- ========================== SPEED & FOV (FIXED) ==========================
+local currentSpeed = 16
+local currentFOV = 70
+
+local function updateSpeed()
+    local char = player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = currentSpeed
+        end
+    end
+end
+
+-- Force FOV every frame (overrides any game script)
+local function updateFOV()
+    local cam = workspace.CurrentCamera
+    if cam then
+        cam.FieldOfView = currentFOV
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    updateSpeed()
+    updateFOV()
+end)
+
+player.CharacterAdded:Connect(function()
+    task.wait(0.2)
+    updateSpeed()
+    updateFOV()
+end)
+
+-- ========================== KILL BUTTON ==========================
+local function killCharacter()
+    local char = player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.Health = 0
+            Rayfield:Notify({Title = "Kill", Content = "Character killed", Duration = 2})
         else
-            notify("Item", "Not found")
+            Rayfield:Notify({Title = "Kill", Content = "No humanoid found", Duration = 2})
         end
-    end)
+    else
+        Rayfield:Notify({Title = "Kill", Content = "Character does not exist", Duration = 2})
+    end
 end
 
--- Create window
+-- ========================== GRACE AUTOPLAY (FIXED VOID ISSUE) ==========================
+local isGrace = game.PlaceId == 110333320616502
+local graceFeatures = {}
+
+if isGrace then
+    print("[Grace] Autoplay loaded")
+    local Rooms = workspace:WaitForChild("Rooms")
+    
+    local settings = {
+        Running = false,
+        CanStart = false,
+        ActionCooldown = 0.7,
+        DoorDelay = 0.5,
+        ProcessedRooms = {},
+        CurrentRoom = 0,
+        LastRoomLabel = nil,
+        AutoPlayToggle = nil,
+    }
+    
+    local function getRoomNumber(room)
+        return tonumber(room.Name)
+    end
+    
+    local function getLatestRoomNumber()
+        local highest = 0
+        for _, room in Rooms:GetChildren() do
+            local num = getRoomNumber(room)
+            if num and num > highest then highest = num end
+        end
+        return highest
+    end
+    
+    local function teleportToCFrame(cf)
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = cf
+            return true
+        end
+        return false
+    end
+    
+    -- Helper to find a valid teleport target inside a room (Entrance or any BasePart)
+    local function getRoomTeleportTarget(room)
+        local entrance = room:FindFirstChild("Entrance")
+        if entrance and entrance:IsA("BasePart") then
+            return entrance.CFrame
+        end
+        -- fallback: any part inside the room (avoid void)
+        for _, child in ipairs(room:GetDescendants()) do
+            if child:IsA("BasePart") and child.Name ~= "Hitbox" then
+                return child.CFrame
+            end
+        end
+        return nil
+    end
+    
+    local function processRoom(room, roomNumber)
+        if settings.ProcessedRooms[roomNumber] then return false end
+        
+        local targetCFrame = getRoomTeleportTarget(room)
+        if not targetCFrame then
+            warn("No valid teleport target in room", roomNumber)
+            return false
+        end
+        
+        teleportToCFrame(targetCFrame)
+        task.wait(settings.DoorDelay)
+        
+        -- Safe room Scale handling (unchanged)
+        local safeRoomModel = room:FindFirstChild("SafeRoom")
+        local scaleModel = safeRoomModel and safeRoomModel:FindFirstChild("Scale")
+        if scaleModel and scaleModel:IsA("Model") then
+            local hitbox = scaleModel:FindFirstChild("Hitbox") or scaleModel:FindFirstChildWhichIsA("BasePart")
+            if hitbox then
+                local function checkAttribute()
+                    local inRoom = player:GetAttribute("InRoom") or player:GetAttribute("ClientInRoom")
+                    return inRoom and tonumber(inRoom) == roomNumber
+                end
+                local startTime = tick()
+                while tick() - startTime < 10 do
+                    if checkAttribute() then
+                        teleportToCFrame(hitbox.CFrame)
+                        task.wait(1.5)
+                        settings.ProcessedRooms[roomNumber] = true
+                        return true
+                    end
+                    task.wait(0.1)
+                end
+                settings.ProcessedRooms[roomNumber] = true
+                return true
+            end
+        end
+        
+        -- Normal room: expand plug/beacon hitboxes
+        local vault = room:FindFirstChild("VaultEntrance")
+        local prompt = vault and vault:FindFirstChild("Hinged") and vault.Hinged:FindFirstChild("Cylinder") and vault.Hinged.Cylinder:FindFirstChild("ProximityPrompt")
+        if prompt then
+            local trigger = ReplicatedStorage:FindFirstChild("TriggerPrompt")
+            if trigger then trigger:FireServer(prompt) end
+            teleportToCFrame(vault:GetPivot())
+            task.wait(settings.ActionCooldown)
+        end
+        
+        local plug = room:FindFirstChild("Plug")
+        local plugTouch = plug and plug:FindFirstChild("plugTouch")
+        if plugTouch then
+            plugTouch.Size = Vector3.new(2048,2048,2048)
+            plugTouch.CFrame = (player.Character and player.Character:GetPivot()) or plugTouch.CFrame
+            task.wait(settings.ActionCooldown)
+        end
+        
+        local beacon = room:FindFirstChild("Beacon")
+        local beaconHitbox = beacon and beacon:FindFirstChild("Hitbox")
+        if beaconHitbox then
+            beaconHitbox.Size = Vector3.new(2048,2048,2048)
+            beaconHitbox.CFrame = (player.Character and player.Character:GetPivot()) or beaconHitbox.CFrame
+            task.wait(settings.ActionCooldown)
+        end
+        
+        settings.ProcessedRooms[roomNumber] = true
+        return true
+    end
+    
+    local function autoplayLoop()
+        while settings.Running and settings.CanStart do
+            local latestRoomNumber = getLatestRoomNumber()
+            if latestRoomNumber > settings.CurrentRoom then
+                settings.CurrentRoom = latestRoomNumber
+                if settings.LastRoomLabel then
+                    settings.LastRoomLabel:Set("Last Room: " .. latestRoomNumber)
+                end
+            end
+            
+            -- Find the highest unprocessed room
+            local targetRoom = nil
+            local targetNumber = 0
+            for _, room in Rooms:GetChildren() do
+                local num = getRoomNumber(room)
+                if num and not settings.ProcessedRooms[num] and num > targetNumber then
+                    targetNumber = num
+                    targetRoom = room
+                end
+            end
+            
+            if targetRoom then
+                processRoom(targetRoom, targetNumber)
+                task.wait(settings.ActionCooldown)
+            else
+                task.wait(0.5)
+            end
+        end
+    end
+    
+    local autoplayThread = nil
+    local function setAutoplay(enabled)
+        settings.Running = enabled
+        if enabled and settings.CanStart then
+            if autoplayThread then task.cancel(autoplayThread) end
+            autoplayThread = task.spawn(autoplayLoop)
+        elseif not enabled and autoplayThread then
+            task.cancel(autoplayThread)
+            autoplayThread = nil
+        end
+    end
+    
+    local function checkFirstSafeRoom()
+        local highest = getLatestRoomNumber()
+        if highest >= 24 then
+            settings.CanStart = true
+            return true
+        else
+            settings.CanStart = false
+            Rayfield:Notify({Title = "Grace", Content = "Please reach room 24 or higher first", Duration = 4})
+            local conn
+            conn = Rooms.ChildAdded:Connect(function()
+                if getLatestRoomNumber() >= 24 then
+                    settings.CanStart = true
+                    conn:Disconnect()
+                    Rayfield:Notify({Title = "Grace", Content = "Autoplay now available", Duration = 3})
+                    if settings.Running then setAutoplay(true) end
+                end
+            end)
+            return false
+        end
+    end
+    checkFirstSafeRoom()
+    
+    graceFeatures = {
+        toggle = setAutoplay,
+        getSettings = function() return settings end,
+        teleportToLastRoom = function()
+            local latest = getLatestRoomNumber()
+            if latest == 0 then return end
+            for _, room in Rooms:GetChildren() do
+                if getRoomNumber(room) == latest then
+                    local targetCFrame = getRoomTeleportTarget(room)
+                    if targetCFrame then
+                        teleportToCFrame(targetCFrame)
+                        Rayfield:Notify({Title = "Grace", Content = "Teleported to room " .. latest, Duration = 2})
+                    else
+                        Rayfield:Notify({Title = "Grace", Content = "No valid teleport point", Duration = 2})
+                    end
+                    break
+                end
+            end
+        end,
+        resetProcessed = function()
+            settings.ProcessedRooms = {}
+            settings.CurrentRoom = 0
+            Rayfield:Notify({Title = "Grace", Content = "Reset processed rooms", Duration = 2})
+        end
+    }
+end
+
+-- ========================== RAYFIELD UI ==========================
 local Window = Rayfield:CreateWindow({
-    Name = "MRACE " .. authorCredit .. (isMobile and " 📱" or ""),
-    LoadingTitle = "MRACE Script",
+    Name = "GradeScript" .. authorCredit,
+    LoadingTitle = "Grace Script",
     LoadingSubtitle = authorCredit,
-    ConfigurationSaving = {Enabled = true, FolderName = "MRACEConfig", FileName = "MRACESettings"},
+    ConfigurationSaving = {Enabled = true, FolderName = "SorrowTools", FileName = "Settings"},
     KeySystem = false,
 })
 
--- Tabs
-local MainTab = Window:CreateTab("Main", 4483362458)
-local VisualsTab = Window:CreateTab("Visuals", 4483362458)
-local PlayerTab = Window:CreateTab("Player", 4483362458)
-local BadgeTab = Window:CreateTab("Badge", 4483362458)
-local GraceTab = Window:CreateTab("Grace", 4483362458)
+-- Main Tab (Utility)
+local MainTab = Window:CreateTab("⚙️ Main", nil)
 
--- Room label
-local RoomLabel = MainTab:CreateLabel("Rooms: 0")
-
--- Main tab
-MainTab:CreateButton({Name = "Delete Entities", Callback = function()
-    for _, n in ipairs(REMOTES) do
-        local ev = ReplicatedStorage:FindFirstChild(n)
-        if ev and ev:IsA("RemoteEvent") then ev:Destroy() end
-    end
-    notify("Entities", "Deleted")
-end})
-
-MainTab:CreateButton({Name = "Delete Enemies", Callback = function()
-    local count = deleteEnemies()
-    notify("Delete Enemies", "Deleted " .. count .. " enemies")
-end})
-
-MainTab:CreateToggle({Name = "Auto Delete Enemies", CurrentValue = false, Flag = "AutoDeleteEnemiesToggle",
-    Callback = function(Value) deleteEnemiesOn = Value; if Value then startAutoDeleteEnemies() end end})
-
-MainTab:CreateToggle({Name = "Autofarm", CurrentValue = false, Flag = "AutofarmToggle",
-    Callback = function(Value) farming = Value; if Value then startAutofarm() else if farmConnection then farmConnection:Disconnect() end end end})
-
-MainTab:CreateToggle({Name = "AutoMod", CurrentValue = false, Flag = "AutoModToggle",
-    Callback = function(Value) if Value then startAutoMod() else if autoModConnection then autoModConnection:Disconnect() end end end})
-
-MainTab:CreateToggle({Name = "Beacons", CurrentValue = false, Flag = "BeaconsToggle",
-    Callback = function(Value) beaconsOn = Value; if Value then startBeacons() else if beaconConnection then beaconConnection:Disconnect() end end end})
-
--- Visuals tab
-VisualsTab:CreateToggle({Name = "FullBright", CurrentValue = false, Flag = "FullbrightToggle",
-    Callback = function(Value) fullbrightOn = Value
+MainTab:CreateToggle({
+    Name = "Auto Delete Entities (Worm, Rush, Rain, elkman, GOATPORT, goat*, Rue/Mime parts)",
+    CurrentValue = false,
+    Flag = "AutoDeleteToggle",
+    Callback = function(Value)
+        autoDeleteActive = Value
         if Value then
-            Lighting.Ambient = Color3.new(1, 1, 1)
-            Lighting.Brightness = 3
-            Lighting.GlobalShadows = false
-            Lighting.Technology = Enum.Technology.Compatibility
-            Lighting.FogEnd = 9e9
+            startDeleteLoop()
+            Rayfield:Notify({Title = "Deleter", Content = "Active – scanning Workspace, PlayerGui, ReplicatedStorage", Duration = 3})
         else
-            Lighting.Ambient = ORIGINAL_LIGHTING.Ambient
-            Lighting.Brightness = ORIGINAL_LIGHTING.Brightness
-            Lighting.GlobalShadows = ORIGINAL_LIGHTING.GlobalShadows
-            Lighting.Technology = ORIGINAL_LIGHTING.Technology
-            Lighting.FogColor = ORIGINAL_LIGHTING.FogColor
-            Lighting.FogEnd = ORIGINAL_LIGHTING.FogEnd
-            Lighting.FogStart = ORIGINAL_LIGHTING.FogStart
+            stopDeleteLoop()
         end
-    end})
+    end
+})
 
-VisualsTab:CreateToggle({Name = "ESP", CurrentValue = false, Flag = "ESPToggle",
-    Callback = function(Value) espOn = Value; if not Value then for _, h in ipairs(espHighlights) do if h and h.Parent then h:Destroy() end end; espHighlights = {} end end})
+MainTab:CreateButton({
+    Name = "Delete Entities Once",
+    Callback = function()
+        deleteEntities()
+        Rayfield:Notify({Title = "Delete", Content = "Manual deletion complete", Duration = 2})
+    end
+})
 
-VisualsTab:CreateToggle({Name = "Player ESP", CurrentValue = false, Flag = "PlayerESPToggle",
-    Callback = function(Value) playerEspOn = Value; if not Value then for _, h in ipairs(playerEspHighlights) do if h and h.Parent then h:Destroy() end end; playerEspHighlights = {} end end})
+MainTab:CreateToggle({
+    Name = "FullBright",
+    CurrentValue = false,
+    Flag = "FullbrightToggle",
+    Callback = function(Value) toggleFullbright(Value) end
+})
 
--- Player tab
-PlayerTab:CreateToggle({Name = "Third Person", CurrentValue = false, Flag = "ThirdPersonToggle",
-    Callback = function(Value) thirdpersonOn = Value
+-- Player Tab (Stats, Kill)
+local PlayerTab = Window:CreateTab("👤 Player", nil)
+
+PlayerTab:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 300},
+    Increment = 1,
+    CurrentValue = 16,
+    Flag = "SpeedSlider",
+    Callback = function(Value)
+        currentSpeed = Value
+        updateSpeed()
+    end
+})
+
+PlayerTab:CreateSlider({
+    Name = "FOV (broken)",
+    Range = {70, 120},
+    Increment = 1,
+    CurrentValue = 70,
+    Flag = "FOVSlider",
+    Callback = function(Value)
+        currentFOV = Value
+        updateFOV()
+    end
+})
+
+PlayerTab:CreateButton({
+    Name = "Kills yourself",
+    Callback = killCharacter
+})
+
+-- Domain Tab
+local DomainTab = Window:CreateTab("🌌 Domain", nil)
+
+DomainTab:CreateToggle({
+    Name = "Sorrow Domain Teleport (Beacon + BloodOcean)",
+    CurrentValue = false,
+    Flag = "SorrowTeleport",
+    Callback = function(Value)
         if Value then
-            player.CameraMaxZoomDistance = 20
-            player.CameraMinZoomDistance = 5
-            player.CameraMode = Enum.CameraMode.Classic
+            sorrowActive = true
+            startSorrowLoop()
         else
-            player.CameraMaxZoomDistance = 0.5
-            player.CameraMinZoomDistance = 0.5
-            player.CameraMode = Enum.CameraMode.LockFirstPerson
-        end
-    end})
-
-PlayerTab:CreateToggle({Name = "No Clip", CurrentValue = false, Flag = "NoClipToggle",
-    Callback = function(Value) noClipOn = Value; if Value then saveNoClipState() else restoreNoClipState() end end})
-
-PlayerTab:CreateSlider({Name = "Character Scale", Range = {0.2, 3}, Increment = 0.1, CurrentValue = 1, Flag = "ScaleSlider",
-    Callback = function(Value) setPlayerScale(Value) end})
-
-PlayerTab:CreateSlider({Name = "Walk Speed", Range = {16, 100}, Increment = 1, CurrentValue = 16, Flag = "WalkSpeedSlider",
-    Callback = function(Value) currentWalkSpeed = Value end})
-
-PlayerTab:CreateSlider({Name = "Jump Power", Range = {50, 200}, Increment = 5, CurrentValue = 50, Flag = "JumpPowerSlider",
-    Callback = function(Value) currentJumpPower = Value end})
-
--- Badge tab
-BadgeTab:CreateButton({Name = "Get All Badges", Callback = function() getAllBadges() end})
-BadgeTab:CreateButton({Name = "Get All Stickers", Callback = function() getAllStickers() end})
-
--- Grace tab
-GraceTab:CreateToggle({Name = "Fly Mode", CurrentValue = false, Flag = "FlyModeToggle",
-    Callback = function(Value) flyModeOn = Value; if Value then startAdminFly() else stopAdminFly() end end})
-
-GraceTab:CreateToggle({Name = "Speed Hack", CurrentValue = false, Flag = "SpeedHackToggle",
-    Callback = function(Value) speedHackOn = Value end})
-
-GraceTab:CreateButton({Name = "Start Recording", Callback = function() startRecordingPositions() end})
-GraceTab:CreateButton({Name = "Stop Recording", Callback = function() stopRecordingPositions() end})
-GraceTab:CreateButton({Name = "Execute Flashback", Callback = function() executeFlashback() end})
-GraceTab:CreateButton({Name = "Server Hop", Callback = function() TeleportService:Teleport(game.PlaceId, player) end})
-
-GraceTab:CreateInput({Name = "Item ID", PlaceholderText = "Enter ID", RemoveTextAfterFocusLost = false,
-    Callback = function(Text) giveItemById(Text) end})
-
--- Main loops
-task.spawn(function() while task.wait(0.5) do if espOn then pcall(updateESP) end end end)
-task.spawn(function() while task.wait(1) do if playerEspOn then pcall(updatePlayerESP) end end end)
-task.spawn(function() while task.wait(0.1) do
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        local h = player.Character.Humanoid
-        h.WalkSpeed = currentWalkSpeed
-        h.JumpPower = currentJumpPower
-    end
-end end)
-
-task.spawn(function() while task.wait() do
-    if noClipOn and player.Character then
-        for _, p in ipairs(player.Character:GetDescendants()) do
-            if p:IsA("BasePart") then p.CanCollide = false end
+            stopSorrowLoop()
         end
     end
-end end)
+})
 
-task.spawn(function() while task.wait(0.5) do
-    local rooms = workspace:FindFirstChild("Rooms")
-    if rooms then
-        local count = 0
-        for _, room in ipairs(rooms:GetChildren()) do
-            if tonumber(room.Name) then count = count + 1 end
+DomainTab:CreateToggle({
+    Name = "delete sorrow domain monster thing",
+    CurrentValue = false,
+    Flag = "TragedyDelete",
+    Callback = function(Value)
+        if Value then
+            tragedyActive = true
+            startTragedyLoop()
+        else
+            stopTragedyLoop()
         end
-        roomCount = count
-        RoomLabel:Set("Rooms: " .. roomCount)
     end
-end end)
+})
 
-task.spawn(function() while task.wait(0.05) do
-    if recordingPositions and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        table.insert(flashbackPositions, player.Character.HumanoidRootPart.CFrame)
-        if #flashbackPositions > 300 then table.remove(flashbackPositions, 1) end
-    end
-end end)
+-- Debug Tab
+local DebugTab = Window:CreateTab("🐞 Debug", nil)
 
--- Fly controls
-if not isMobile then
-    UIS.InputBegan:Connect(function(input, gp)
-        if gp or not flying or not flyBodyVelocity then return end
-        local speed = 50
-        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            local cam = workspace.CurrentCamera
-            local dir = cam.CFrame.LookVector
-            local right = cam.CFrame.RightVector
-            if input.KeyCode == Enum.KeyCode.W then flyBodyVelocity.Velocity = dir * speed
-            elseif input.KeyCode == Enum.KeyCode.S then flyBodyVelocity.Velocity = dir * -speed
-            elseif input.KeyCode == Enum.KeyCode.A then flyBodyVelocity.Velocity = right * -speed
-            elseif input.KeyCode == Enum.KeyCode.D then flyBodyVelocity.Velocity = right * speed
-            elseif input.KeyCode == Enum.KeyCode.Space then flyBodyVelocity.Velocity = Vector3.new(0, speed, 0)
-            elseif input.KeyCode == Enum.KeyCode.LeftShift then flyBodyVelocity.Velocity = Vector3.new(0, -speed, 0)
-            end
-        end
-    end)
+DebugTab:CreateButton({
+    Name = "Scan Workspace/PlayerGui for Entities (idk what this does)",
+    Callback = debugScanEntities
+})
+
+-- Grace Tab (only if in Grace)
+if isGrace then
+    local GraceTab = Window:CreateTab("🎮 Grace", nil)
+    local settings = graceFeatures.getSettings()
     
-    UIS.InputEnded:Connect(function(input, gp)
-        if gp or not flying or not flyBodyVelocity then return end
-        if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.S or
-           input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.D or
-           input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.LeftShift then
-            flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    local lastRoomLabel = GraceTab:CreateLabel("Last Room: 0")
+    settings.LastRoomLabel = lastRoomLabel
+    
+    settings.AutoPlayToggle = GraceTab:CreateToggle({
+        Name = "Autoplay (broken)",
+        CurrentValue = false,
+        Flag = "GraceAutoplay",
+        Callback = function(Value)
+            if not settings.CanStart then
+                Rayfield:Notify({Title = "Grace", Content = "Wait until you've passed room 24 for autoplay.", Duration = 3})
+                return
+            end
+            graceFeatures.toggle(Value)
         end
-    end)
-end
-
-notify("MRACE", "Loaded successfully!" .. (isMobile and " 📱" or ""))
+    })
+    
+    GraceTab:CreateButton({
+        Name = "TP to Last Room",
+        Callback = function()
+            if settings.Running then
+                Rayfield:Notify({Title = "Grace", Content = "Stop autoplay first", Duration = 2})
+                return
+            end
+            graceFeatures.teleportToLastRoom()
+        end
+    })
+    
+    GraceTab:CreateButton({
+        Name = "Reset Processed Rooms",
+        Callback = function()
+            if settings.Running then
+                Rayfield:Notify({Title = "Grace", Content = "Stop autoplay first", Duration = 2})
+                return
+            end
+            graceFeatures.resetProcessed()
+        end
+    })
+    
+    GraceTab:CreateSlider({
+        Name = "Door Delay (seconds at each door)",
+        Range = {0, 3},
+        Increment = 0.05,
+        CurrentValue = 0.5,
+        Flag = "DoorDelay",
+        Callback = function(Value) settings.DoorDelay = Value end
+    })

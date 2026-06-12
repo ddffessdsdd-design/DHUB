@@ -254,7 +254,6 @@ local function killCharacter()
 end
 
 -- ========================== GRACE AUTOPLAY (FIXED VOID ISSUE) ==========================
-local isGrace = game.PlaceId == 110333320616502
 local graceFeatures = {}
 
 if isGrace then

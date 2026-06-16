@@ -1,10 +1,18 @@
 local id = game.PlaceId
 
+-- BITE BY NIGHT
 if id == 70845479499574 then 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/BBN"))()
 
+-- NPC OR DIE
 elseif id == 11276071411 then 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/Npcordie"))()
+
+-- DOORS
+elseif id == 6516141723 then
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/Doors"))()
+
+
 
 else
     print("game isnt supported")

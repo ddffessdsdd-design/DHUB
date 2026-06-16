@@ -9,6 +9,9 @@ elseif id == 70845479499574 then  -- BITE BY NIGHT
 elseif id == 138837502355157 then  -- GRACE
     loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/Grace"))()
 
+elseif id == 12411473842 then -- PRESSURE
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/Pressure"))()
+-- ——————— --
 else
     print("game isnt supported")
 end

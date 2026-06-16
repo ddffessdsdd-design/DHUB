@@ -5,6 +5,8 @@ if id == 70845479499574 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/BBN"))()
 
 -- GRACE
+if id == 138837502355157 then
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/Grace"))()
 
 -- DOORS
 elseif id == 6516141723 then

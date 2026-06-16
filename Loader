@@ -1,18 +1,13 @@
 local id = game.PlaceId
 
--- BITE BY NIGHT
-if id == 70845479499574 then 
+if id == 6516141723 then  -- DOORS
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/Doors"))()
+
+elseif id == 70845479499574 then  -- BITE BY NIGHT
     loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/BBN"))()
 
--- GRACE
-if id == 138837502355157 then
-loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/Grace"))()
-
--- DOORS
-elseif id == 6516141723 then
-loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/Doors"))()
-
-
+elseif id == 138837502355157 then  -- GRACE
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/ddffessdsdd-design/DHUB/refs/heads/main/Grace"))()
 
 else
     print("game isnt supported")
